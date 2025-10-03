@@ -1,0 +1,78 @@
+module axi_stream_downsizer ( 
+    input clk, 
+    input rst, 
+    input [1:0] input_width_select, // Select input width: 2'b00=32, 2'b01=64 
+    input [1:0] output_width_select, // Select output width: 2'b00=8, 2'b01=16 
+    // AXI Stream Slave Interface (Input) 
+    input [63:0] s_axis_tdata, 
+    input s_axis_tvalid, 
+    output reg s_axis_tready, 
+    input s_axis_tlast, 
+    // AXI Stream Master Interface (Output) 
+    output reg [15:0] m_axis_tdata, 
+    output reg m_axis_tvalid, 
+    input m_axis_tready, 
+    output reg m_axis_tlast 
+); 
+ 
+    // Internal signals 
+    reg [63:0] data_buffer;     // Buffer to hold input data 
+    reg [5:0] chunk_counter; // Tracks which part of the input data is being sent 
+    reg [5:0] ratio;                   // Number of output transactions per input 
+ 
+    // Output width calculation based on the select signal 
+    wire [5:0] input_width = (input_width_select == 2'b00) ? 32 : 64; 
+  
+    wire [5:0] output_width = (output_width_select == 2'b00) ? 8 : 16; 
+ 
+    // Calculate ratio (number of output chunks per input) 
+    always @(posedge clk or posedge rst) begin 
+        if (rst) begin 
+            // Reset internal states 
+            chunk_counter <= 0; 
+            s_axis_tready <= 1; 
+            m_axis_tvalid <= 0; 
+            m_axis_tdata <= 0; 
+            m_axis_tlast <= 0; 
+            data_buffer <= 0; 
+            ratio <= input_width / output_width; // Calculate the number of chunks 
+        end else begin 
+            // Handle input stream 
+            if (s_axis_tvalid && s_axis_tready) begin 
+                data_buffer <= s_axis_tdata; // Store incoming data 
+                chunk_counter <= 0; 
+                s_axis_tready <= 0;         // Wait until all chunks are processed 
+            end 
+ 
+            // Handle output stream 
+            if (!s_axis_tready) begin 
+                m_axis_tvalid <= 1; 
+ 
+                // Send the appropriate chunk based on output width (8 or 16 bits) 
+                if (output_width == 8) begin 
+                    m_axis_tdata <= data_buffer[chunk_counter * 8 +: 8]; // 8-bit output chunk 
+                end else if (output_width == 16) begin 
+                    m_axis_tdata <= data_buffer[chunk_counter * 16 +: 16]; // 16-bit output chunk 
+                end 
+
+                // Handle TLAST signal on the last chunk 
+                if (chunk_counter == ratio - 1) begin 
+                    m_axis_tlast <= s_axis_tlast; // Propagate TLAST on the last chunk 
+                end else begin 
+                    m_axis_tlast <= 0; 
+                end 
+ 
+                // If m_axis_tready is high, move to the next chunk 
+                if (m_axis_tvalid && m_axis_tready) begin 
+                    chunk_counter <= chunk_counter + 1; 
+ 
+                    // Once all chunks are processed, reset and indicate readiness for new data 
+                    if (chunk_counter == ratio - 1) begin 
+                        m_axis_tvalid <= 0; 
+                        s_axis_tready <= 1; // Ready for the next input transaction 
+                    end 
+                end 
+            end 
+        end 
+    end 
+endmodule
