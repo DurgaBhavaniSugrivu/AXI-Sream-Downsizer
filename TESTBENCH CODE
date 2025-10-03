@@ -1,0 +1,116 @@
+module axi_stream_downsizer_tb; 
+    // Parameters 
+    reg clk; 
+    reg rst; 
+    reg [1:0] input_width_select; 
+    reg [1:0] output_width_select; 
+    reg [63:0] s_axis_tdata; 
+    reg s_axis_tvalid; 
+    reg s_axis_tlast; 
+    wire s_axis_tready; 
+    wire [15:0] m_axis_tdata; 
+    wire m_axis_tvalid; 
+    reg m_axis_tready; 
+    wire m_axis_tlast; 
+ 
+    // Instantiate the AXI Stream Downsizer 
+    axi_stream_downsizer uut ( 
+        .clk(clk), 
+        .rst(rst), 
+        .input_width_select(input_width_select), 
+        .output_width_select(output_width_select), 
+        .s_axis_tdata(s_axis_tdata), 
+        .s_axis_tvalid(s_axis_tvalid), 
+        .s_axis_tready(s_axis_tready), 
+        .s_axis_tlast(s_axis_tlast), 
+        .m_axis_tdata(m_axis_tdata), 
+        .m_axis_tvalid(m_axis_tvalid), 
+        .m_axis_tready(m_axis_tready), 
+        .m_axis_tlast(m_axis_tlast) 
+    ); 
+ 
+    // Clock generation 
+    initial begin 
+        clk = 0; 
+        forever #5 clk = ~clk; // 100 MHz clock 
+    end 
+ 
+    // Testbench logic 
+    initial begin 
+        // Initialize signals 
+        rst = 1; 
+        input_width_select = 2'b00; // Default 32-bit input 
+        output_width_select = 2'b00; // Default 8-bit output 
+        s_axis_tdata = 0; 
+        s_axis_tvalid = 0; 
+        s_axis_tlast = 0; 
+        m_axis_tready = 1; 
+ 
+        // Reset sequence 
+        #20; 
+        rst = 0; 
+ 
+        // Test Case 1: 64-bit input, 8-bit output 
+        input_width_select = 2'b01; // 64-bit input 
+        output_width_select = 2'b00; // 8-bit output 
+        s_axis_tdata = 64'h123456789ABCDEF0; 
+        s_axis_tvalid = 1; 
+        s_axis_tlast = 1; 
+ 
+        #50; 
+        s_axis_tvalid = 0; 
+ 
+        // Test Case 2: 64-bit input, 16-bit output 
+        #20; 
+        input_width_select = 2'b01; // 64-bit input 
+        output_width_select = 2'b01; // 16-bit output 
+        s_axis_tdata = 64'hFEDCBA9876543210; 
+        s_axis_tvalid = 1; 
+        s_axis_tlast = 1; 
+ 
+        #50; 
+        s_axis_tvalid = 0; 
+ 
+        // Test Case 3: 32-bit input, 8-bit output 
+        #20; 
+        input_width_select = 2'b00; // 32-bit input 
+        output_width_select = 2'b00; // 8-bit output 
+        s_axis_tdata = 32'h89ABCDEF; 
+        s_axis_tvalid = 1; 
+        s_axis_tlast = 1; 
+ 
+        #50; 
+        s_axis_tvalid = 0; 
+ 
+        // Test Case 4: 32-bit input, 16-bit output 
+        #20; 
+        input_width_select = 2'b00; // 32-bit input 
+        output_width_select = 2'b01; // 16-bit output 
+        s_axis_tdata = 32'h12345678; 
+        s_axis_tvalid = 1; 
+        s_axis_tlast = 1; 
+ 
+        #50; 
+        s_axis_tvalid = 0; 
+ 
+        // Test Case 5: Mixed sequence 
+        #20; 
+        input_width_select = 2'b01; // 64-bit input 
+        output_width_select = 2'b01; // 16-bit output 
+        s_axis_tdata = 64'hAABBCCDDEEFF1122; 
+        s_axis_tvalid = 1; 
+        s_axis_tlast = 0; 
+ 
+        #30; 
+        s_axis_tdata = 64'h33445566778899AA; 
+        s_axis_tvalid = 1; 
+        s_axis_tlast = 1; 
+ 
+        #50; 
+        s_axis_tvalid = 0;   
+        // End simulation 
+        #100; 
+        $finish; 
+    end 
+ 
+endmodule
